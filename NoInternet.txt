@@ -1,0 +1,80 @@
+(modified from http://ubuntuforums.org/showthread.php?t=1188099)
+
+These instructions show how to start specific programs without allowing them access
+to the internet. It could be useful when starting Windows programs under Wine, if you
+don't know what program does over the network, or you simply don't trust the program.
+
+Step 1.
+-------
+Create a group called "no-internet" and add your user as a member of this new group.
+(System->Administration->Users and Groups)
+Logout and then log back in again to make the group permissions take effect.
+
+Step 2.
+-------
+Create a script (somewhere in your PATH) called "ni" (stands for No Internet),
+as follows:
+
+sudo nano /usr/bin/ni
+
+with this contents:
+
+#!/bin/bash
+COMMAND="$1"
+shift
+for arg; do
+COMMAND="$COMMAND \"$arg\""
+done
+sg no-internet "$COMMAND"
+
+And make it executable:
+
+sudo chmod +x /usr/bin/ni
+
+Step 3.
+-------
+Create a script called iptables_no-internet_rule as follows:
+
+sudo nano /etc/network/if-pre-up.d/iptables_no-internet_rule
+
+or, alternatively, if above doesn't work after restart:
+
+sudo nano /etc/network/if-up.d/iptables_no-internet_rule
+
+with this contents:
+
+#!/bin/bash
+iptables -I OUTPUT 1 -m owner --gid-owner no-internet -j DROP
+
+or, alternativly, if you want to block only outside traffic:
+
+iptables -I OUTPUT 1 -m owner --gid-owner no-internet ! -d 192.168.0.0/24 -j DROP
+
+And make it executable:
+
+sudo chmod +x /etc/network/if-pre-up.d/iptables_no-internet_rule
+#sudo chmod +x /etc/network/if-up.d/iptables_no-internet_rule
+
+Step 4.
+-------
+Enable the new firewall settings you made above in step 3 by running the
+following command:
+
+sudo /etc/network/if-pre-up.d/iptables_no-internet_rule
+#sudo /etc/network/if-up.d/iptables_no-internet_rule
+
+Step 5.
+-------
+Finished. You can now run any program without allowing that program to access
+the network by using this command:
+
+ni program_name [arguments]
+
+Examples:
+
+ni ping www.google.com
+ni wine install.exe
+ni firefox
+
+Using this with Wine Launcher Creator is fairly easy, just change wine command from "wine" to "ni wine".
+

@@ -1,0 +1,14 @@
+Wine Launcher Creator can be installed anywhere in the PATH, eg. /usr/local/bin/
+(just copy it there as root), or anywhere in the home directory.
+
+Program must be declated as executable (if it isn't):
+
+chmod +x /path/to/wlcreator.py
+
+
+The program can be used as nautilus script, just make a symlink to it with:
+
+cd ~/.gnome2/nautilus-scripts/
+ln -s /path/to/wlcreator.py Wine\ Launcher\ Creator
+
+
