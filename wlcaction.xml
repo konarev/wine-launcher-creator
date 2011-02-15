@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gconfentryfile>
+  <entrylist base="/apps/nautilus-actions/configurations/183e1368-3396-4f96-80d7-cac59171bd4d">
+    <entry>
+      <key>type</key>
+      <value>
+        <string>Action</string>
+      </value>
+    </entry>
+    <entry>
+      <key>items</key>
+      <value>
+        <list type="string">
+          <value>
+            <string>profile-zero</string>
+          </value>
+        </list>
+      </value>
+    </entry>
+    <entry>
+      <key>label</key>
+      <value>
+        <string>Wine Launcher Creator</string>
+      </value>
+    </entry>
+    <entry>
+      <key>toolbar-label</key>
+      <value>
+        <string>Wine Launcher Creator</string>
+      </value>
+    </entry>
+    <entry>
+      <key>profile-zero/desc-name</key>
+      <value>
+        <string>Default profile</string>
+      </value>
+    </entry>
+    <entry>
+      <key>profile-zero/path</key>
+      <value>
+        <string>/usr/local/bin/wlcreator.py</string>
+      </value>
+    </entry>
+    <entry>
+      <key>profile-zero/parameters</key>
+      <value>
+        <string>%d/%f</string>
+      </value>
+    </entry>
+    <entry>
+      <key>profile-zero/basenames</key>
+      <value>
+        <list type="string">
+          <value>
+            <string>*.exe</string>
+          </value>
+        </list>
+      </value>
+    </entry>
+    <entry>
+      <key>profile-zero/matchcase</key>
+      <value>
+        <bool>false</bool>
+      </value>
+    </entry>
+  </entrylist>
+</gconfentryfile>

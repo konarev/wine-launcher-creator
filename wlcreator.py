@@ -16,7 +16,7 @@
 #    You should have received a copy of the GNU General Public License
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-VERSION="1.0"
+VERSION="1.0.1"
 
 import sys
 import glob
@@ -178,7 +178,7 @@ class MainWindow(QMainWindow):
             self.exeCallback, "exe (*.exe *.EXE)", setStatus=self.setStatus)
         self.layout1.addLayout(self.executable)
 
-        self.application = BrowseControl("App path", "Select application path", "Path to application's top directory"+
+        self.application = BrowseControl("Toplevel app path", "Select toplevel application path", "Path to application's toplevel directory"+
             "\n(used to search for additional ico/png files)", self.appCallback, browseDirectory=True, setStatus=self.setStatus)
         self.layout1.addLayout(self.application)
 
@@ -227,6 +227,11 @@ class MainWindow(QMainWindow):
 
         self.wine = EditControl("Wine command", "Command used to run Windows applications")
         self.layout2.addLayout(self.wine)
+
+        label = QLabel("Additional information about restricting internet access to (untrusted) (Windows)<br>application can be found in /usr/local/share/wlcreator/NoInternet.txt")
+        label.setTextFormat(Qt.RichText)
+        self.layout2.addWidget(label)
+        
 
         #temorary directory for icon extraction
         self.temporary = tempfile.mkdtemp()

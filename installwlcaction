@@ -1,0 +1,3 @@
+#!/bin/bash
+gconftool-2 --load /usr/local/share/wlcreator/wlcaction.xml
+

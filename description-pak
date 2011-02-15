@@ -1,0 +1,3 @@
+Wine Launcher Creator is a tool for easy creation of windows launchers. Program can be used from command line, or as nautilus action or script.
+To use it as nautilus action, you need to install nautilus-actions package, and using System->Preferences->Nautilus Actions Configuration to import /usr/local/share/wlcreator/wlcaction.xml, or alternatively, to run installwlcaction command.
+To use it as nautilus script, you can enable it using System->Preferences->Nautilus scripts manager, or alternatively, you can run installwlcscript command.
