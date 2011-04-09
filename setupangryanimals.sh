@@ -6,7 +6,8 @@
 
 NAME="Angry Animals"
 GAMEDIR=~/".angryanimals"
-DESKTOP=~/"Desktop/$NAME.desktop"
+DESKTOP=$(xdg-user-dir DESKTOP)
+DESKTOP=~/"$DESKTOP/$NAME.desktop"
 
 SWFNAME=angryanimals.swf
 JPGNAME=angryanimals.jpg

@@ -382,7 +382,8 @@ class MainWindow(QMainWindow):
             self.wine.edit.setText(cfg.get("WLCreator","Wine"))
         else:
             #if config doesn't exist, set default values
-            path = os.path.expanduser("~/Desktop")
+            #path = os.path.expanduser("~/Desktop")
+            path = subprocess.check_output(["xdg-user-dir", "DESKTOP"])
             self.launcher.edit.setText(path)
             path = os.path.expanduser("~/.icons")
             self.icons.edit.setText(path)
