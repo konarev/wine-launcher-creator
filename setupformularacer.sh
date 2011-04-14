@@ -4,16 +4,16 @@
 #Date:    04 April 2011
 #Author:  Zarko Zivanov zzarko@gmail.com
 
-NAME="Angry Animals"
-GAMEDIR=~/".angryanimals"
+NAME="Formula Racer"
+GAMEDIR=~/".formularacer"
 DESKTOP=$(xdg-user-dir DESKTOP)
 DESKTOP="$DESKTOP/$NAME.desktop"
 
-SWFNAME=angryanimals.swf
-JPGNAME=angryanimals.jpg
-PNGNAME=angryanimals.png
-SWFURL=http://www.flashninjaclan.com/games2/angryanimals/$SWFNAME
-JPGURL=http://www.flashninjaclan.com/games2/angryanimals/$JPGNAME
+SWFNAME=FormulaRacer.swf
+JPGNAME=game_formularacer.gif
+PNGNAME=formularacer.png
+SWFURL=http://www.turbonuke.com/flashgames/$SWFNAME
+JPGURL=http://www.turbonuke.com/images/$JPGNAME
 FLASHGZ=flashplayer_10_sa.tar.gz
 FLASH=flashplayer
 FLASHURL=http://download.macromedia.com/pub/flashplayer/updaters/10/$FLASHGZ

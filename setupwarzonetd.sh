@@ -4,16 +4,18 @@
 #Date:    04 April 2011
 #Author:  Zarko Zivanov zzarko@gmail.com
 
-NAME="Angry Animals"
-GAMEDIR=~/".angryanimals"
-DESKTOP=$(xdg-user-dir DESKTOP)
-DESKTOP="$DESKTOP/$NAME.desktop"
+NAME="Warzone Tower Defense"
+GAMEDIR=~/".warzonetowerdefense"
+DESKTOP=~/"Desktop/$NAME.desktop"
 
-SWFNAME=angryanimals.swf
-JPGNAME=angryanimals.jpg
-PNGNAME=angryanimals.png
-SWFURL=http://www.flashninjaclan.com/games2/angryanimals/$SWFNAME
-JPGURL=http://www.flashninjaclan.com/games2/angryanimals/$JPGNAME
+
+#http://www.flashninjaclan.com/games2/warzonetowerdefenseextended/warzonetowerdefenseextrended.jpg
+
+SWFNAME=warzonetowerdefenseextended.swf
+JPGNAME=warzonetowerdefenseextrended.jpg
+PNGNAME=warzonetowerdefenseextended.png
+SWFURL=http://www.flashninjaclan.com/games2/warzonetowerdefenseextended/$SWFNAME
+JPGURL=http://www.flashninjaclan.com/games2/warzonetowerdefenseextended/$JPGNAME
 FLASHGZ=flashplayer_10_sa.tar.gz
 FLASH=flashplayer
 FLASHURL=http://download.macromedia.com/pub/flashplayer/updaters/10/$FLASHGZ
@@ -57,6 +59,9 @@ if [ $? -gt 0 ]; then
     error "$JPGNAME download error!"
 fi
 convert $JPGNAME $PNGNAME
+if [ $? -gt 0 ]; then
+    error "$JPGNAME convert error!"
+fi
 rm $JPGNAME
 
 #try to download flash player
