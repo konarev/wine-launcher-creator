@@ -16,7 +16,7 @@
 #    You should have received a copy of the GNU General Public License
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-VERSION="1.0.1"
+VERSION="1.0.3"
 
 import sys
 import glob
@@ -26,9 +26,27 @@ import subprocess
 import shlex
 import shutil
 import ConfigParser
+import urllib
 
 from PyQt4.QtGui import *
 from PyQt4.QtCore import *
+
+def check_output(*popenargs, **kwargs):
+    """This function is copied from python 2.7.1 subprocess.py
+       Copyright (c) 2003-2005 by Peter Astrand <astrand@lysator.liu.se>
+       Licensed to PSF under a Contributor Agreement.
+       See http://www.python.org/2.4/license for licensing details."""
+    if 'stdout' in kwargs:
+        raise ValueError('stdout argument not allowed, it will be overridden.')
+    process = subprocess.Popen(stdout=subprocess.PIPE, *popenargs, **kwargs)
+    output, unused_err = process.communicate()
+    retcode = process.poll()
+    if retcode:
+        cmd = kwargs.get("args")
+        if cmd is None:
+            cmd = popenargs[0]
+        raise CalledProcessError(retcode, cmd, output=output)
+    return output
 
 def bash(command):
     """Helper function to execute bash commands"""
@@ -237,9 +255,11 @@ class MainWindow(QMainWindow):
         self.temporary = tempfile.mkdtemp()
         #first argument is path to exe file
         path = os.path.abspath(sys.argv[1]) if len(sys.argv) > 1 else ""
+        path = urllib.unquote(path)
         self.executable.edit.setText(path)
         #second argument is path to main application directory (ico files search path)
         path = os.path.abspath(sys.argv[2]) if len(sys.argv) > 2 else os.path.dirname(self.executable.path)
+        path = urllib.unquote(path)
         self.application.edit.setText(path)
 
         #directory for program's configuration file
@@ -362,7 +382,7 @@ class MainWindow(QMainWindow):
         launcherText += "\nIcon=" + iconDestination
         #full path to launcher
         launcherPath = os.path.join(self.launcher.path, self.name.text+".desktop")
-        #drite launcher's contents
+        #write launcher's contents
         launcherFile = open(launcherPath, "w")
         launcherFile.write(launcherText)
         launcherFile.close()
@@ -383,7 +403,8 @@ class MainWindow(QMainWindow):
         else:
             #if config doesn't exist, set default values
             #path = os.path.expanduser("~/Desktop")
-            path = subprocess.check_output(["xdg-user-dir", "DESKTOP"])
+            path = check_output(["xdg-user-dir", "DESKTOP"])
+            while path[-1] == "\n": path = path[:-1]
             self.launcher.edit.setText(path)
             path = os.path.expanduser("~/.icons")
             self.icons.edit.setText(path)
@@ -420,7 +441,7 @@ class MainWindow(QMainWindow):
         text += "<br>Chair for Applied Computer Science"
         text += ', <a href="http://www.acs.uns.ac.rs/">http://www.acs.uns.ac.rs</a>'
         text += "<br><br>Linux User Group of Novi Sad"
-        text += ', <a href="http://www.ns-linux.org/">http://www.ns-linux.org</a>'
+        text += ', <a href="http://www.lugons.org/">http://www.lugons.org/</a>'
 
         gpl = "This program is free software: you can redistribute it and/or modify"
         gpl += "\nit under the terms of the GNU General Public License as published by"
