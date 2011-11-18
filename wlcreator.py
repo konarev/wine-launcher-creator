@@ -48,11 +48,11 @@ def check_output(*popenargs, **kwargs):
         raise CalledProcessError(retcode, cmd, output=output)
     return output
 
-def bash(command):
+def bash(command, workdir=None):
     """Helper function to execute bash commands"""
     command = shlex.split(command.encode("utf-8"))
     try:
-        code = subprocess.call(command, stderr=subprocess.STDOUT, stdout=subprocess.PIPE)
+        code = subprocess.call(command, stderr=subprocess.STDOUT, stdout=subprocess.PIPE, cwd=workdir)
     except:
         code = 127
     return code
@@ -61,10 +61,6 @@ def checkDependencies():
     """Helper function to check for imagemagick/icoutils"""
     missing = False
     missingText = ""
-    #check imagemagick
-    if bash("convert --version") > 0:
-        missingText = "Missing dependencie: imagemagick"
-        missing = True
     #check icoutils
     if bash("wrestool --version") > 0:
         if missingText != "":
@@ -316,27 +312,22 @@ class MainWindow(QMainWindow):
             bash("find \"" + self.application.path + "/\" -maxdepth 1 -iname \"*.png\" -exec cp '{}' \"" + self.temporary + "\"/ \\;")
             #png files are searched only in selected directory (non-recursive) because many games have a lot of png files
         #create list if ico files
-        icoList = glob.glob( os.path.join(self.temporary, '*.ico') )
-        ICOList = glob.glob( os.path.join(self.temporary, '*.ICO') )
-        icoList.extend(ICOList)
+        if len(os.listdir(self.temporary)) == 0:
+            self.setStatus("Could not extract/find any icons! Try using wrestool manually.")
+            return
+
         #convert ico files to png files
-        for ico in icoList:
-            icoName = os.path.basename(ico)
-            png = os.path.join(self.temporary,icoName+".png")
-            if bash("convert -alpha on \"" + ico + "\" \"" + png + "\"") > 0:
-                bash("convert \"" + ico + "\" \"" + png + "\"")
+        bash("icotool -x " + " ".join(os.listdir(self.temporary)), self.temporary)
+
         #create list of png files
         pngList = glob.glob( os.path.join(self.temporary, '*.png') )
         PNGList = glob.glob( os.path.join(self.temporary, '*.PNG') )
         pngList.extend(PNGList)
         if len(pngList) == 0:
-            if len(icoList) == 0:
-                self.setStatus("Could not extract/find any icons! Try using wrestool manually.")
-            else:
-                self.setStatus("Could not convert ico(s) to png(s)! Try using convert manually, or try GIMP.")
-                #copy extracted icons to app directory
-                if len(extractedList) > 0:
-                    for f in extractedList: bash("cp \"" + f + "\" \"" + self.application.path + "\"")
+            self.setStatus("Could not convert ico(s) to png(s)! Try using convert manually, or try GIMP.")
+            #copy extracted icons to app directory
+            if len(extractedList) > 0:
+                for f in extractedList: bash("cp \"" + f + "\" \"" + self.application.path + "\"")
             return
         #insert png files in iconWidget
         for png in pngList:
