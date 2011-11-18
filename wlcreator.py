@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# -*- coding: UTF-8 -*-
+# -*- coding: utf-8 -*-
 
 #    Wine Launcher Creator (c) 2011  Žarko Živanov
 
@@ -50,7 +50,7 @@ def check_output(*popenargs, **kwargs):
 
 def bash(command):
     """Helper function to execute bash commands"""
-    command = shlex.split(command)
+    command = shlex.split(command.encode("utf-8"))
     try:
         code = subprocess.call(command, stderr=subprocess.STDOUT, stdout=subprocess.PIPE)
     except:
@@ -129,7 +129,7 @@ class BrowseControl(QHBoxLayout):
         dialog.setAcceptMode(QFileDialog.AcceptOpen)
         if dialog.exec_() == QDialog.Accepted:
             #if user selected something
-            self.path = str(dialog.selectedFiles()[0])
+            self.path = unicode(dialog.selectedFiles()[0])
             self.pathValid = True
             self.noCallback = True
             self.edit.setText(self.path)
@@ -139,7 +139,7 @@ class BrowseControl(QHBoxLayout):
 
     def edited(self):
         """callback for edit control"""
-        self.path = str(self.edit.text())
+        self.path = unicode(self.edit.text())
         self.pathValid = os.access(self.path, os.F_OK)
         if self.pathValid:
             if self.setStatus != None: self.setStatus()
@@ -166,7 +166,7 @@ class EditControl(QHBoxLayout):
 
     def edited(self):
         """callback for edit control"""
-        self.text = str(self.edit.text())
+        self.text = unicode(self.edit.text())
         if self.callback != None: self.callback()
 
 class MainWindow(QMainWindow):
@@ -361,7 +361,7 @@ class MainWindow(QMainWindow):
             self.setStatus("You need to select an icon first.")
             return
         #full path to selected icon
-        iconSource = str(items[0].data(Qt.UserRole).toString())
+        iconSource = unicode(items[0].data(Qt.UserRole).toString())
         #icon's name
         iconName = os.path.basename(iconSource)
         #full path to destination icon
@@ -384,7 +384,7 @@ class MainWindow(QMainWindow):
         launcherPath = os.path.join(self.launcher.path, self.name.text+".desktop")
         #write launcher's contents
         launcherFile = open(launcherPath, "w")
-        launcherFile.write(launcherText)
+        launcherFile.write(launcherText.encode("utf-8"))
         launcherFile.close()
         #make it executable
         bash("chmod 755 \"" + launcherPath + "\"")
@@ -397,13 +397,13 @@ class MainWindow(QMainWindow):
             #if config exists, load it
             cfg = ConfigParser.SafeConfigParser()
             cfg.read(cfgfile)
-            self.launcher.edit.setText(cfg.get("WLCreator","Launcher"))
-            self.icons.edit.setText(cfg.get("WLCreator","Icons"))
-            self.wine.edit.setText(cfg.get("WLCreator","Wine"))
+            self.launcher.edit.setText(cfg.get("WLCreator","Launcher").decode("utf-8"))
+            self.icons.edit.setText(cfg.get("WLCreator","Icons").decode("utf-8"))
+            self.wine.edit.setText(cfg.get("WLCreator","Wine").decode("utf-8"))
         else:
             #if config doesn't exist, set default values
             #path = os.path.expanduser("~/Desktop")
-            path = check_output(["xdg-user-dir", "DESKTOP"])
+            path = check_output(["xdg-user-dir", "DESKTOP"]).decode("utf-8")
             while path[-1] == "\n": path = path[:-1]
             self.launcher.edit.setText(path)
             path = os.path.expanduser("~/.icons")
@@ -419,9 +419,9 @@ class MainWindow(QMainWindow):
         cfg = ConfigParser.SafeConfigParser()
         if not cfg.has_section("WLCreator"):
             cfg.add_section("WLCreator")
-        cfg.set("WLCreator","Launcher",self.launcher.path)
-        cfg.set("WLCreator","Icons",self.icons.path)
-        cfg.set("WLCreator","Wine",self.wine.text)
+        cfg.set("WLCreator","Launcher",self.launcher.path.encode("utf-8"))
+        cfg.set("WLCreator","Icons",self.icons.path.encode("utf-8"))
+        cfg.set("WLCreator","Wine",self.wine.text.encode("utf-8"))
         cfg.write(cfgfile)
 
     def settingsToggle(self):
