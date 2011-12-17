@@ -1,6 +1,6 @@
 prefix=/usr/local/
 name=wine-launcher-creator
-version=1.0.3
+version=1.0.4
 
 cleanmac = \
 	rm -f /usr/share/nautilus-scripts/Wine\ Launcher\ Creator ; \
