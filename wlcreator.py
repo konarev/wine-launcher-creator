@@ -254,7 +254,7 @@ class MainWindow(QMainWindow):
         path = urllib.unquote(path)
         self.executable.edit.setText(path.decode("utf-8"))
         #second argument is path to main application directory (ico files search path)
-        path = os.path.abspath(sys.argv[2]) if len(sys.argv) > 2 else os.path.dirname(self.executable.path)
+        path = os.path.abspath(sys.argv[2]) if len(sys.argv) > 2 else os.path.dirname(self.executable.path).encode("utf-8")
         path = urllib.unquote(path)
         self.application.edit.setText(path.decode("utf-8"))
 
