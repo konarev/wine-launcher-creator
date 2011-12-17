@@ -252,11 +252,11 @@ class MainWindow(QMainWindow):
         #first argument is path to exe file
         path = os.path.abspath(sys.argv[1]) if len(sys.argv) > 1 else ""
         path = urllib.unquote(path)
-        self.executable.edit.setText(path)
+        self.executable.edit.setText(path.decode("utf-8"))
         #second argument is path to main application directory (ico files search path)
         path = os.path.abspath(sys.argv[2]) if len(sys.argv) > 2 else os.path.dirname(self.executable.path)
         path = urllib.unquote(path)
-        self.application.edit.setText(path)
+        self.application.edit.setText(path.decode("utf-8"))
 
         #directory for program's configuration file
         self.config = os.path.expanduser("~/.config/wlcreator")
