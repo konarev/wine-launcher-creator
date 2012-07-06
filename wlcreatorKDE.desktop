@@ -1,0 +1,18 @@
+
+[Desktop Entry]
+Actions=CreateLauncher;
+Icon=dialog-information
+ServiceTypes=KonqPopupMenu/Plugin,application/x-ms-dos-executable
+Type=Service
+X-KDE-Priority=TopLevel
+#X-KDE-Submenu=Wine
+TryExec=wlcreator.py
+
+[Desktop Action CreateLauncher]
+Name=Wine Launcher Creator
+Icon=wine
+Exec=wlcreator.py %u
+Name[en_US]=Wine Launcher Creator
+Name[en]=Wine Launcher Creator
+Name[C]=Wine Launcher Creator
+

@@ -1,0 +1,12 @@
+#!/usr/bin/env xdg-open
+
+[Desktop Entry]
+Version=1.0
+Type=Application
+Terminal=false
+Name=Wine Launcher Creator
+Comment=wine launcher
+Exec="/usr/local/bin/wlcreator.py"
+Path=/usr/local/bin/
+Icon=wine
+Categories=System;

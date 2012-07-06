@@ -1,3 +1,0 @@
-#!/bin/bash
-ln -s /usr/local/bin/wlcreator.py ~/.gnome2/nautilus-scripts/Wine\ Launcher\ Creator
-

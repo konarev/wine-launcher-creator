@@ -1,0 +1,21 @@
+
+[Desktop Entry]
+Type=Action
+Icon[en_US]=wine
+Icon[en]=wine
+Icon[C]=wine
+ToolbarLabel[en_US]=Wine Launcher Creator
+ToolbarLabel[en]=Wine Launcher Creator
+ToolbarLabel[C]=Wine Launcher Creator
+Name[en_US]=Wine Launcher Creator
+Name[en]=Wine Launcher Creator
+Name[C]=Wine Launcher Creator
+Profiles=profile-zero;
+
+[X-Action-Profile profile-zero]
+Matchcase=false
+Basenames=*.exe;*.bat;
+Exec=/usr/local/bin/wlcreator.py %f
+Name[en_US]=Default profile
+Name[en]=Default profile
+Name[C]=Default profile

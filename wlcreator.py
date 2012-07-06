@@ -16,7 +16,7 @@
 #    You should have received a copy of the GNU General Public License
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-VERSION="1.0.4"
+VERSION="1.0.5"
 
 import sys
 import glob
@@ -75,7 +75,8 @@ def checkDependencies():
 class BrowseControl(QHBoxLayout):
     """Control containing label, edit field and button
        Used to browse for files and directories"""
-    def __init__(self, label, browseTitle, toolTip, callback=None, extensions="", browseDirectory=False, setStatus=None, parent=None):
+    def __init__(self, label, browseTitle, toolTip, callback=None, extensions="", browseDirectory=False,
+                 setStatus=None, showHidden=False, parent=None):
         super(BrowseControl, self).__init__(parent)
 
         #control's label
@@ -99,6 +100,8 @@ class BrowseControl(QHBoxLayout):
         self.extensions = extensions
         #select file or directory
         self.browseDirectory = browseDirectory
+        #show or hide hidden files
+        self.showHidden = showHidden
         #function for setStatus display
         self.setStatus = setStatus
         #text for invalid path
@@ -116,6 +119,8 @@ class BrowseControl(QHBoxLayout):
             #dialog for selecting directories
             dialog = QFileDialog(None,self.browseTitle,self.edit.text())
             dialog.setFileMode(QFileDialog.Directory)
+            if self.showHidden:
+                dialog.setFilter(QDir.AllEntries | QDir.Hidden )
         else:
             #dialog for selecting files
             dialog = QFileDialog(None,self.browseTitle,os.path.dirname(self.path),self.extensions)
@@ -170,7 +175,8 @@ class MainWindow(QMainWindow):
     def __init__(self, parent=None): 
         super(MainWindow, self).__init__(parent)
 
-        self.setWindowTitle("Wine Launcher Creator") 
+        self.setWindowTitle("Wine Launcher Creator")
+        self.setWindowIcon(QIcon.fromTheme('wine'))
 
         self.centralWidget = QWidget()
         self.centralWidgetLayout = QVBoxLayout()
@@ -209,6 +215,11 @@ class MainWindow(QMainWindow):
         self.iconWidget.setResizeMode(QListView.Adjust)
         self.iconWidget.setIconSize(QSize(256,256))
 
+        self.prefix = BrowseControl("Wine prefix path", "Select Wine prefix path", 
+            "Path to directory containing Wine bottle", browseDirectory=True, setStatus=self.setStatus, showHidden=True)
+        self.layout1.addLayout(self.prefix)
+
+        #always visible buttons
         layout = QHBoxLayout()
         self.centralWidgetLayout.addLayout(layout)
         button = QPushButton("Settings")
@@ -231,21 +242,41 @@ class MainWindow(QMainWindow):
         self.centralWidgetLayout.addWidget(self.widget2)
         self.widget2.hide()
 
-        self.launcher = BrowseControl("Launcher path", "Select launcher path", "Path to directory for launcher creation",
-            setStatus=self.setStatus)
+        self.launcher = BrowseControl("Launcher path", "Select launcher path",
+            "Path to directory for launcher creation", browseDirectory=True, setStatus=self.setStatus)
         self.layout2.addLayout(self.launcher)
 
         self.icons = BrowseControl("Icons path", "Select icons path", "Path to directory for storing icons",
-            setStatus=self.setStatus)
+            browseDirectory=True, setStatus=self.setStatus)
         self.layout2.addLayout(self.icons)
 
         self.wine = EditControl("Wine command", "Command used to run Windows applications")
         self.layout2.addLayout(self.wine)
 
-        label = QLabel("Additional information about restricting internet access to (untrusted) (Windows)<br>application can be found in /usr/local/share/wlcreator/NoInternet.txt")
+        button = QPushButton("Install Wine Launcher Creator as Nautilus 2 Action")
+        self.layout2.addWidget(button)
+        self.connect(button, SIGNAL("clicked()"), self.nautilus2Action)
+
+        button = QPushButton("Install Wine Launcher Creator as Nautilus 3 Action")
+        self.layout2.addWidget(button)
+        self.connect(button, SIGNAL("clicked()"), self.nautilus3Action)
+
+        button = QPushButton("Install Wine Launcher Creator as Nautilus Script")
+        self.layout2.addWidget(button)
+        self.connect(button, SIGNAL("clicked()"), self.nautilusScript)
+
+        button = QPushButton("Install Wine Launcher Creator as Dolphin Service menu")
+        self.layout2.addWidget(button)
+        self.connect(button, SIGNAL("clicked()"), self.dolphinMenu)
+
+        label = QLabel("""Additional information about restricting internet access to (untrusted) (Windows)
+            <br>application can be found in /usr/local/share/wlcreator/NoInternet.txt""")
         label.setTextFormat(Qt.RichText)
         self.layout2.addWidget(label)
-        
+
+        button = QPushButton("Open NoInternet.txt")
+        self.layout2.addWidget(button)
+        self.connect(button, SIGNAL("clicked()"), self.openNoInternet)
 
         #temorary directory for icon extraction
         self.temporary = tempfile.mkdtemp()
@@ -367,7 +398,8 @@ class MainWindow(QMainWindow):
         launcherText += "\nVersion=1.0"
         launcherText += "\nType=Application"
         launcherText += "\nTerminal=false"
-        launcherText += "\nExec=" + self.wine.text + " \"" + self.executable.path + "\""
+        launcherText += "\nExec=env WINEPREFIX=\"" + self.prefix.path + "\" " + \
+                        self.wine.text + " \"" + self.executable.path + "\""
         launcherText += "\nPath=" + exeDirectory
         launcherText += "\nName=" + self.name.text
         launcherText += "\nIcon=" + iconDestination
@@ -384,22 +416,24 @@ class MainWindow(QMainWindow):
     def loadConfig(self):
         """load configuration options"""
         cfgfile = os.path.join(self.config,"settings.ini")
+        path = check_output(["xdg-user-dir", "DESKTOP"]).decode("utf-8")
+        while path[-1] == "\n": path = path[:-1]
+        cfgDefaults = {'launcher': path, 'icons': os.path.expanduser("~/.local/share/icons/wlcreator"),
+                       'wine': "wine", 'wineprefix': os.path.expanduser("~/.wine")}
         if os.access(cfgfile, os.F_OK):
             #if config exists, load it
-            cfg = ConfigParser.SafeConfigParser()
+            cfg = ConfigParser.SafeConfigParser(cfgDefaults)
             cfg.read(cfgfile)
             self.launcher.edit.setText(cfg.get("WLCreator","Launcher").decode("utf-8"))
             self.icons.edit.setText(cfg.get("WLCreator","Icons").decode("utf-8"))
             self.wine.edit.setText(cfg.get("WLCreator","Wine").decode("utf-8"))
+            self.prefix.edit.setText(cfg.get("WLCreator","WinePrefix").decode("utf-8"))
         else:
             #if config doesn't exist, set default values
-            #path = os.path.expanduser("~/Desktop")
-            path = check_output(["xdg-user-dir", "DESKTOP"]).decode("utf-8")
-            while path[-1] == "\n": path = path[:-1]
-            self.launcher.edit.setText(path)
-            path = os.path.expanduser("~/.icons")
-            self.icons.edit.setText(path)
-            self.wine.edit.setText("wine")
+            self.launcher.edit.setText(cfgDefaults['launcher'])
+            self.icons.edit.setText(cfgDefaults['icons'])
+            self.wine.edit.setText(cfgDefaults['wine'])
+            self.prefix.edit.setText(cfgDefaults['wineprefix'])
 
     def saveConfig(self):
         """save configuration options"""
@@ -413,6 +447,7 @@ class MainWindow(QMainWindow):
         cfg.set("WLCreator","Launcher",self.launcher.path.encode("utf-8"))
         cfg.set("WLCreator","Icons",self.icons.path.encode("utf-8"))
         cfg.set("WLCreator","Wine",self.wine.text.encode("utf-8"))
+        cfg.set("WLCreator","WinePrefix",self.prefix.path.encode("utf-8"))
         cfg.write(cfgfile)
 
     def settingsToggle(self):
@@ -424,6 +459,24 @@ class MainWindow(QMainWindow):
             self.widget1.show()
             self.widget2.hide()
 
+    def nautilus2Action(self):
+        bash("gconftool-2 --load /usr/local/share/wlcreator/wlcaction.xml")
+
+    def nautilus3Action(self):
+        bash("cp /usr/local/share/wlcreator/wlcreatorGnome.desktop " + \
+            os.path.expanduser("~/.local/share/file-manager/actions/"))
+
+    def nautilusScript(self):
+        bash("ln -s /usr/local/bin/wlcreator.py " + \
+            os.path.expanduser("~/.gnome2/nautilus-scripts/Wine\ Launcher\ Creator"))
+
+    def dolphinMenu(self):
+        bash("cp /usr/local/share/wlcreator/wlcreatorKDE.desktop " + \
+            os.path.expanduser("~/.kde/share/kde4/services/"))
+
+    def openNoInternet(self):
+        bash("xdg-open /usr/local/share/wlcreator/NoInternet.txt")
+
     def about(self):
         """displays about dialog"""
         text = u"Wine Launcher Creator v"+VERSION+u" (c) 2011  Žarko Živanov"
@@ -434,20 +487,21 @@ class MainWindow(QMainWindow):
         text += "<br><br>Linux User Group of Novi Sad"
         text += ', <a href="http://www.lugons.org/">http://www.lugons.org/</a>'
 
-        gpl = "This program is free software: you can redistribute it and/or modify"
-        gpl += "\nit under the terms of the GNU General Public License as published by"
-        gpl += "\nthe Free Software Foundation, either version 3 of the License, or"
-        gpl += "\n(at your option) any later version.\n"
-        gpl += "\nThis program is distributed in the hope that it will be useful,"
-        gpl += "\nbut WITHOUT ANY WARRANTY; without even the implied warranty of"
-        gpl += "\nMERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the"
-        gpl += "\nGNU General Public License for more details.\n"
-        gpl += "\nYou should have received a copy of the GNU General Public License"
-        gpl += "\nalong with this program.  If not, see <http://www.gnu.org/licenses/>."
+        gpl = "<br><br>This program is free software: you can redistribute it and/or modify"
+        gpl += "it under the terms of the GNU General Public License as published by"
+        gpl += "the Free Software Foundation, either version 3 of the License, or"
+        gpl += "(at your option) any later version."
+        gpl += "<br><br>This program is distributed in the hope that it will be useful,"
+        gpl += "but WITHOUT ANY WARRANTY; without even the implied warranty of"
+        gpl += "MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the"
+        gpl += "GNU General Public License for more details."
+        gpl += "<br><br>You should have received a copy of the GNU General Public License"
+        gpl += "along with this program. If not, see "
+        gpl += "<a href=http://www.gnu.org/licenses>http://www.gnu.org/licenses</a>."
 
-        dialog = QMessageBox(QMessageBox.Information,"About",text)
+        dialog = QMessageBox(QMessageBox.Information,"About",text+gpl)
+#        dialog.setInformativeText(gpl)
         dialog.setTextFormat(Qt.RichText)
-        dialog.setInformativeText(gpl)
         dialog.exec_()
 
 if __name__ == '__main__':
@@ -457,4 +511,17 @@ if __name__ == '__main__':
         main.show()
         app.exec_()
         main.cleanup()
+
+"""
+History of changes
+
+Version 1.0.5
+    - Added Wine prefix setting and changed Exec part of the launcher to include it
+    - Default icons path changed to ~/.local/share/icons/wlcreator/
+    - gpl text in About dilaog converted to RichText
+    - Added program icon - I used 'Wine' icon, as I'm no artist - any contribution is welcome
+    - Added various ways to install in Nautilus and Dolphin directly from GUI
+    - Added wlcreator.desktop and wlcreatorKDE.desktop for Nautilus 3 and Dolphin integration
+    - Removed ImageMagick dependency from deb file
+"""
 
