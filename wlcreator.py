@@ -16,7 +16,7 @@
 #    You should have received a copy of the GNU General Public License
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-VERSION="1.0.5"
+VERSION="1.0.6"
 
 import sys
 import glob
@@ -51,10 +51,12 @@ def check_output(*popenargs, **kwargs):
 def bash(command, workdir=None):
     """Helper function to execute bash commands"""
     command = shlex.split(command.encode("utf-8"))
+    print "COMMAND:",command
     try:
         code = subprocess.call(command, stderr=subprocess.STDOUT, stdout=subprocess.PIPE, cwd=workdir)
     except:
         code = 127
+    print "CODE:",code
     return code
 
 def checkDependencies():
@@ -199,7 +201,7 @@ class MainWindow(QMainWindow):
         self.layout1.addLayout(self.executable)
 
         self.application = BrowseControl("Toplevel app path", "Select toplevel application path", "Path to application's toplevel directory"+
-            "\n(used to search for additional ico/png files)", self.appCallback, browseDirectory=True, setStatus=self.setStatus)
+            "\n(used to search for additional ico/png files and to guess application name)", self.appCallback, browseDirectory=True, setStatus=self.setStatus)
         self.layout1.addLayout(self.application)
 
         self.name = EditControl("Name","Launcher's name")
@@ -278,6 +280,10 @@ class MainWindow(QMainWindow):
         self.layout2.addWidget(button)
         self.connect(button, SIGNAL("clicked()"), self.openNoInternet)
 
+        button = QPushButton("Revert settings to default values")
+        self.layout2.addWidget(button)
+        self.connect(button, SIGNAL("clicked()"), self.defaultConfig)
+
         #temorary directory for icon extraction
         self.temporary = tempfile.mkdtemp()
         #first argument is path to exe file
@@ -289,12 +295,22 @@ class MainWindow(QMainWindow):
         path = urllib.unquote(path)
         self.application.edit.setText(path.decode("utf-8"))
 
+        #user's desktop location
+        self.desktopPath = check_output(["xdg-user-dir", "DESKTOP"]).decode("utf-8")
+        while self.desktopPath[-1] == "\n": self.desktopPath = self.desktopPath[:-1]
+
+        #default config options
+        self.cfgDefaults = {'Launcher': self.desktopPath,
+                            'Icons': os.path.expanduser("~/.local/share/icons/wlcreator"),
+                            'Wine': "wine",
+                            'WinePrefix': os.path.expanduser("~/.wine")}
+
         #directory for program's configuration file
         self.config = os.path.expanduser("~/.config/wlcreator")
         self.loadConfig()
 
         self.populateIconList()
-        self.resize(QSize(600,500))
+        self.resize(QSize(700,500))
         if self.executable.path == "": self.setStatus("Select an exe file.")
 
     def cleanup(self):
@@ -332,6 +348,7 @@ class MainWindow(QMainWindow):
         """extracts and finds all icons for specified exe and app"""
         self.iconWidget.clear()
         self.clearTemporary()
+        extractedList = None
         if self.executable.path != "":
             #extract icons from exe file
             bash("wrestool -x -t 14 -o \"" + self.temporary + "\" \"" + self.executable.path + "\"")
@@ -342,20 +359,22 @@ class MainWindow(QMainWindow):
             #copy all found png files from the application directory
             bash("find \"" + self.application.path + "/\" -maxdepth 1 -iname \"*.png\" -exec cp '{}' \"" + self.temporary + "\"/ \\;")
             #png files are searched only in selected directory (non-recursive) because many games have a lot of png files
-        #create list if ico files
+        #check if there are any icon files
         if len(os.listdir(self.temporary)) == 0:
             self.setStatus("Could not extract/find any icons! Try using wrestool manually.")
             return
 
         #convert ico files to png files
-        bash("icotool -x " + " ".join(os.listdir(self.temporary)), self.temporary)
+        icoList = glob.glob( os.path.join(self.temporary, '*.ico') )
+        for ico in icoList:
+            bash("icotool -x " + ico, self.temporary)
 
         #create list of png files
         pngList = glob.glob( os.path.join(self.temporary, '*.png') )
         PNGList = glob.glob( os.path.join(self.temporary, '*.PNG') )
         pngList.extend(PNGList)
         if len(pngList) == 0:
-            self.setStatus("Could not convert ico(s) to png(s)! Try using convert manually, or try GIMP.")
+            self.setStatus("Could not convert ico(s) to png(s)! Try using icotool manually, or try GIMP.")
             #copy extracted icons to app directory
             if len(extractedList) > 0:
                 for f in extractedList: bash("cp \"" + f + "\" \"" + self.application.path + "\"")
@@ -411,29 +430,37 @@ class MainWindow(QMainWindow):
         launcherFile.close()
         #make it executable
         bash("chmod 755 \"" + launcherPath + "\"")
-        self.setStatus("Launcher created in "+self.launcher.path)
+        launcherLocalAppPath = os.path.join(os.path.expanduser("~/.local/share/applications/wlcreator/"), self.name.text+".desktop")
+        if launcherPath != launcherLocalAppPath:
+            shutil.copyfile(launcherPath,launcherLocalAppPath)
+            self.setStatus("Launcher created in "+self.launcher.path+". A copy is also in ~/.local/share/applications/wlcreator/")
+        else:
+            self.setStatus("Launcher created in "+self.launcher.path)
+
+
+    def defaultConfig(self):
+        """creates default configuration options"""
+        self.launcher.edit.setText(self.cfgDefaults['Launcher'])
+        self.icons.edit.setText(self.cfgDefaults['Icons'])
+        self.wine.edit.setText(self.cfgDefaults['Wine'])
+        self.prefix.edit.setText(self.cfgDefaults['WinePrefix'])
 
     def loadConfig(self):
         """load configuration options"""
         cfgfile = os.path.join(self.config,"settings.ini")
-        path = check_output(["xdg-user-dir", "DESKTOP"]).decode("utf-8")
-        while path[-1] == "\n": path = path[:-1]
-        cfgDefaults = {'launcher': path, 'icons': os.path.expanduser("~/.local/share/icons/wlcreator"),
-                       'wine': "wine", 'wineprefix': os.path.expanduser("~/.wine")}
+        cfgRead = False
         if os.access(cfgfile, os.F_OK):
             #if config exists, load it
-            cfg = ConfigParser.SafeConfigParser(cfgDefaults)
+            cfg = ConfigParser.SafeConfigParser(self.cfgDefaults)
             cfg.read(cfgfile)
-            self.launcher.edit.setText(cfg.get("WLCreator","Launcher").decode("utf-8"))
-            self.icons.edit.setText(cfg.get("WLCreator","Icons").decode("utf-8"))
-            self.wine.edit.setText(cfg.get("WLCreator","Wine").decode("utf-8"))
-            self.prefix.edit.setText(cfg.get("WLCreator","WinePrefix").decode("utf-8"))
-        else:
-            #if config doesn't exist, set default values
-            self.launcher.edit.setText(cfgDefaults['launcher'])
-            self.icons.edit.setText(cfgDefaults['icons'])
-            self.wine.edit.setText(cfgDefaults['wine'])
-            self.prefix.edit.setText(cfgDefaults['wineprefix'])
+            if "WLCreator" in cfg.sections():
+                self.launcher.edit.setText(cfg.get("WLCreator","Launcher").decode("utf-8"))
+                self.icons.edit.setText(cfg.get("WLCreator","Icons").decode("utf-8"))
+                self.wine.edit.setText(cfg.get("WLCreator","Wine").decode("utf-8"))
+                self.prefix.edit.setText(cfg.get("WLCreator","WinePrefix").decode("utf-8"))
+                cfgRead = True
+        if not cfgRead:
+            self.defaultConfig()
 
     def saveConfig(self):
         """save configuration options"""
@@ -454,25 +481,30 @@ class MainWindow(QMainWindow):
         """toggle between main interface and options"""
         if self.settings.isChecked():
             self.widget1.hide()
+            self.statusBar.hide()
             self.widget2.show()
         else:
             self.widget1.show()
+            self.statusBar.show()
             self.widget2.hide()
 
     def nautilus2Action(self):
         bash("gconftool-2 --load /usr/local/share/wlcreator/wlcaction.xml")
 
     def nautilus3Action(self):
-        bash("cp /usr/local/share/wlcreator/wlcreatorGnome.desktop " + \
-            os.path.expanduser("~/.local/share/file-manager/actions/"))
+        path = os.path.expanduser("~/.local/share/file-manager/actions/")
+        bash("mkdir -p " + path)
+        bash("cp /usr/local/share/wlcreator/wlcreatorGnome.desktop " + path)
 
     def nautilusScript(self):
-        bash("ln -s /usr/local/bin/wlcreator.py " + \
-            os.path.expanduser("~/.gnome2/nautilus-scripts/Wine\ Launcher\ Creator"))
+        path = os.path.expanduser("~/.gnome2/nautilus-scripts/")
+        bash("mkdir -p " + path)
+        bash("ln -s /usr/local/bin/wlcreator.py " + path + "/Wine\ Launcher\ Creator")
 
     def dolphinMenu(self):
-        bash("cp /usr/local/share/wlcreator/wlcreatorKDE.desktop " + \
-            os.path.expanduser("~/.kde/share/kde4/services/"))
+        path = os.path.expanduser("~/.kde/share/kde4/services/")
+        bash("mkdir -p " + path)
+        bash("cp /usr/local/share/wlcreator/wlcreatorKDE.desktop " + path)
 
     def openNoInternet(self):
         bash("xdg-open /usr/local/share/wlcreator/NoInternet.txt")
@@ -515,6 +547,15 @@ if __name__ == '__main__':
 """
 History of changes
 
+Version 1.0.6
+    - Fix for missing 'WLCreator' section in config file
+    - Makefile now creates /usr/share/nautilus-scripts/ directory
+    - Makefile gets program version from wlcreator.py
+    - Readme was made better, program page on google also
+    - Added button to reset configuration options
+    - Fixed png from ico extraction
+    - Fixed file copy for integration into gnome/kde
+
 Version 1.0.5
     - Added Wine prefix setting and changed Exec part of the launcher to include it
     - Default icons path changed to ~/.local/share/icons/wlcreator/
@@ -523,5 +564,15 @@ Version 1.0.5
     - Added various ways to install in Nautilus and Dolphin directly from GUI
     - Added wlcreator.desktop and wlcreatorKDE.desktop for Nautilus 3 and Dolphin integration
     - Removed ImageMagick dependency from deb file
+"""
+
+"""
+Mercurial
+
+To clone repository:
+hg clone https://zzarko@code.google.com/p/wine-launcher-creator/
+
+To push changes:
+hg 
 """
 

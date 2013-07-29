@@ -1,9 +1,11 @@
+# Wine launcher Creator install script
+# If you want to make a deb package using this script, you should install 'checkinstall'
+
 prefix=/usr/local/
 name=wine-launcher-creator
-version=1.0.5
+version=$(shell grep "VERSION=" wlcreator.py | grep -o -E "[.0-9]*")
 
 cleanmac = \
-	rm -f /usr/share/nautilus-scripts/Wine\ Launcher\ Creator ; \
 	rm -f $(prefix)/bin/wlcreator.py ; \
 	rm -f $(prefix)/share/wlcreator/NoInternet.txt ; \
 	rm -f $(prefix)/share/wlcreator/Readme.txt ; \
@@ -17,8 +19,8 @@ cleanmac = \
 install:
 	mkdir -p $(prefix)/bin/
 	mkdir -p $(prefix)/share/wlcreator/
+	mkdir -p /usr/share/nautilus-scripts/
 	install -m 0755 wlcreator.py $(prefix)/bin/
-	ln -s $(prefix)/bin/wlcreator.py /usr/share/nautilus-scripts/Wine\ Launcher\ Creator
 	install -m 0644 NoInternet.txt $(prefix)/share/wlcreator/
 	install -m 0644 Readme.txt $(prefix)/share/wlcreator/
 	install -m 0644 gpl.txt $(prefix)/share/wlcreator/
