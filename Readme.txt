@@ -47,16 +47,22 @@ Integration
 -----------
 To use it as nautilus action, you need to install nautilus-actions package.
 After that, you can use appropriate option in Settings section to install this
-script as nutilus action (for Gnome 2/Mate select Gnome 2, for Gnome 3/Unity/Cinnamon
-select Gnome 3), or alternatively, you can use
-System->Preferences->Nautilus Actions Configuration
+script as nutilus action:
+ - for Gnome 2 select Gnome 2 (maybe works in Mate)
+ - for Gnome 3/Unity select Gnome 3 (maybe works in Cinnamon)
+or alternatively, you can use System->Preferences->Nautilus Actions Configuration
 to import /usr/local/share/wlcreator/wlcaction.xml
 
 To use it as nautilus script, you need to have nautilus-scripts-manager package
 installed. You can enable it using appropriate option in Settings section,
 or alternatively, you can enable it using System->Preferences->Nautilus scripts manager
 
-To use it as a Dolphin Service, select appropriate option in Settings section.
+To use it as a KDE 4 Dolphin Service, select appropriate option in Settings section.
+
+IMPORTANT: Gnome 3 users need to logout/login before new launcher is active, or alternatively,
+press ALT+F2 and enter "r" to restart the shell.
+
+Integration is tested on Ubuntu 12.04 (Unity), OpenSUSE 12.3 (KDE 4) and Fedora 17 (Gnome 3).
 
 
 Command line

@@ -1,7 +1,7 @@
 #!/usr/bin/env xdg-open
 
 [Desktop Entry]
-Version=1.0
+Version=1.0.6
 Type=Application
 Terminal=false
 Name=Wine Launcher Creator

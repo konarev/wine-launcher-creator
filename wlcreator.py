@@ -51,12 +51,12 @@ def check_output(*popenargs, **kwargs):
 def bash(command, workdir=None):
     """Helper function to execute bash commands"""
     command = shlex.split(command.encode("utf-8"))
-    print "COMMAND:",command
+    #print "COMMAND:",command
     try:
         code = subprocess.call(command, stderr=subprocess.STDOUT, stdout=subprocess.PIPE, cwd=workdir)
     except:
         code = 127
-    print "CODE:",code
+    #print "CODE:",code
     return code
 
 def checkDependencies():
@@ -255,11 +255,11 @@ class MainWindow(QMainWindow):
         self.wine = EditControl("Wine command", "Command used to run Windows applications")
         self.layout2.addLayout(self.wine)
 
-        button = QPushButton("Install Wine Launcher Creator as Nautilus 2 Action")
+        button = QPushButton("Install Wine Launcher Creator as Gnome 2 Nautilus Action")
         self.layout2.addWidget(button)
         self.connect(button, SIGNAL("clicked()"), self.nautilus2Action)
 
-        button = QPushButton("Install Wine Launcher Creator as Nautilus 3 Action")
+        button = QPushButton("Install Wine Launcher Creator as Gnome 3 Nautilus Action")
         self.layout2.addWidget(button)
         self.connect(button, SIGNAL("clicked()"), self.nautilus3Action)
 
@@ -267,7 +267,7 @@ class MainWindow(QMainWindow):
         self.layout2.addWidget(button)
         self.connect(button, SIGNAL("clicked()"), self.nautilusScript)
 
-        button = QPushButton("Install Wine Launcher Creator as Dolphin Service menu")
+        button = QPushButton("Install Wine Launcher Creator as KDE 4 Dolphin Service menu")
         self.layout2.addWidget(button)
         self.connect(button, SIGNAL("clicked()"), self.dolphinMenu)
 
@@ -290,7 +290,7 @@ class MainWindow(QMainWindow):
         path = os.path.abspath(sys.argv[1]) if len(sys.argv) > 1 else ""
         path = urllib.unquote(path)
         self.executable.edit.setText(path.decode("utf-8"))
-        #second argument is path to main application directory (ico files search path)
+        #second argument is path to main application directory (ico files search path/initial name guess)
         path = os.path.abspath(sys.argv[2]) if len(sys.argv) > 2 else os.path.dirname(self.executable.path).encode("utf-8")
         path = urllib.unquote(path)
         self.application.edit.setText(path.decode("utf-8"))
@@ -395,7 +395,7 @@ class MainWindow(QMainWindow):
         if not self.application.pathValid: return
         #create icons directory, if it doesn't exist
         if not os.access(self.icons.path, os.F_OK):
-            os.mkdir(self.icons.path)
+            os.makedirs(self.icons.path)
         #get selected icon
         items = self.iconWidget.selectedItems()
         if len(items) == 0:
@@ -430,13 +430,16 @@ class MainWindow(QMainWindow):
         launcherFile.close()
         #make it executable
         bash("chmod 755 \"" + launcherPath + "\"")
-        launcherLocalAppPath = os.path.join(os.path.expanduser("~/.local/share/applications/wlcreator/"), self.name.text+".desktop")
+        launcherLocalAppPath = os.path.expanduser("~/.local/share/applications/wlcreator/")
+        if not os.access(launcherLocalAppPath, os.F_OK):
+            os.makedirs(launcherLocalAppPath)
+        launcherLocalAppPath = os.path.join(launcherLocalAppPath, self.name.text+".desktop")
         if launcherPath != launcherLocalAppPath:
             shutil.copyfile(launcherPath,launcherLocalAppPath)
+            bash("chmod 755 \"" + launcherLocalAppPath + "\"")
             self.setStatus("Launcher created in "+self.launcher.path+". A copy is also in ~/.local/share/applications/wlcreator/")
         else:
             self.setStatus("Launcher created in "+self.launcher.path)
-
 
     def defaultConfig(self):
         """creates default configuration options"""
@@ -466,7 +469,7 @@ class MainWindow(QMainWindow):
         """save configuration options"""
         #create config directory, if it doesn't exist
         if not os.access(self.config, os.F_OK):
-            os.mkdir(self.config)
+            os.makedirs(self.config)
         cfgfile = open(os.path.join(self.config,"settings.ini"),"w")
         cfg = ConfigParser.SafeConfigParser()
         if not cfg.has_section("WLCreator"):
@@ -502,7 +505,11 @@ class MainWindow(QMainWindow):
         bash("ln -s /usr/local/bin/wlcreator.py " + path + "/Wine\ Launcher\ Creator")
 
     def dolphinMenu(self):
-        path = os.path.expanduser("~/.kde/share/kde4/services/")
+        path = os.path.expanduser("~/.kde4/share/kde4/services/ServiceMenus/")
+        bash("mkdir -p " + path)
+        bash("cp /usr/local/share/wlcreator/wlcreatorKDE.desktop " + path)
+        #alternative path; probably can be deleted
+        path = os.path.expanduser("~/.kde/share/kde4/services/ServiceMenus/")
         bash("mkdir -p " + path)
         bash("cp /usr/local/share/wlcreator/wlcreatorKDE.desktop " + path)
 
@@ -549,12 +556,13 @@ History of changes
 
 Version 1.0.6
     - Fix for missing 'WLCreator' section in config file
-    - Makefile now creates /usr/share/nautilus-scripts/ directory
+    - Makefile doesn't create '/usr/share/nautilus-scripts/Wine Launcher Creator' anymore
     - Makefile gets program version from wlcreator.py
     - Readme was made better, program page on google also
     - Added button to reset configuration options
     - Fixed png from ico extraction
     - Fixed file copy for integration into gnome/kde
+    - Main window made a slightly wider
 
 Version 1.0.5
     - Added Wine prefix setting and changed Exec part of the launcher to include it
@@ -564,15 +572,5 @@ Version 1.0.5
     - Added various ways to install in Nautilus and Dolphin directly from GUI
     - Added wlcreator.desktop and wlcreatorKDE.desktop for Nautilus 3 and Dolphin integration
     - Removed ImageMagick dependency from deb file
-"""
-
-"""
-Mercurial
-
-To clone repository:
-hg clone https://zzarko@code.google.com/p/wine-launcher-creator/
-
-To push changes:
-hg 
 """
 

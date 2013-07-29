@@ -5,13 +5,4 @@ To install it in default path, run
 
 sudo make install
 
-
-To run program as nautilus script, run
-
-installwlcscript
-
-
-To run program as nautilus action, run
-
-installwlcaction
-
+Options to integrate Wine Launcher Creator will only work if it is installed in default path.
