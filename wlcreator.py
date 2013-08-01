@@ -51,12 +51,12 @@ def check_output(*popenargs, **kwargs):
 def bash(command, workdir=None):
     """Helper function to execute bash commands"""
     command = shlex.split(command.encode("utf-8"))
-    print "COMMAND:",command
+    #print "COMMAND:",command
     try:
         code = subprocess.call(command, stderr=subprocess.STDOUT, stdout=subprocess.PIPE, cwd=workdir)
     except:
         code = 127
-    print "CODE:",code
+    #print "CODE:",code
     return code
 
 def checkDependencies():
@@ -350,8 +350,13 @@ class MainWindow(QMainWindow):
         self.clearTemporary()
         extractedList = None
         if self.executable.path != "":
-            #extract icons from exe file
-            bash("wrestool -x -t 14 -o \"" + self.temporary + "\" \"" + self.executable.path + "\"")
+            #extract icons from all exe files in exe file's directory
+            path = os.path.dirname(self.executable.path)
+            exeList = glob.glob( os.path.join(path, '*.exe') )
+            EXEList = glob.glob( os.path.join(path, '*.EXE') )
+            exeList.extend(EXEList)
+            for exe in exeList:
+                bash("wrestool -x -t 14 -o \"" + self.temporary + "\" \"" + exe + "\"")
             extractedList = glob.glob( os.path.join(self.temporary, '*.ico') )
         if self.application.path != "":
             #copy all found ico files from the application directory (recursive)
@@ -367,7 +372,7 @@ class MainWindow(QMainWindow):
         #convert ico files to png files
         icoList = glob.glob( os.path.join(self.temporary, '*.ico') )
         for ico in icoList:
-            bash("icotool -x " + ico.replace(' ','\ '), self.temporary)
+            bash("icotool -x " + "\""+ico+"\"", self.temporary)
 
         #create list of png files
         pngList = glob.glob( os.path.join(self.temporary, '*.png') )
