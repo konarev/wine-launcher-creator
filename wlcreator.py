@@ -51,12 +51,12 @@ def check_output(*popenargs, **kwargs):
 def bash(command, workdir=None):
     """Helper function to execute bash commands"""
     command = shlex.split(command.encode("utf-8"))
-    #print "COMMAND:",command
+    print "COMMAND:",command
     try:
         code = subprocess.call(command, stderr=subprocess.STDOUT, stdout=subprocess.PIPE, cwd=workdir)
     except:
         code = 127
-    #print "CODE:",code
+    print "CODE:",code
     return code
 
 def checkDependencies():
@@ -367,7 +367,7 @@ class MainWindow(QMainWindow):
         #convert ico files to png files
         icoList = glob.glob( os.path.join(self.temporary, '*.ico') )
         for ico in icoList:
-            bash("icotool -x " + ico, self.temporary)
+            bash("icotool -x " + ico.replace(' ','\ '), self.temporary)
 
         #create list of png files
         pngList = glob.glob( os.path.join(self.temporary, '*.png') )
