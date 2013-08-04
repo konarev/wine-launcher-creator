@@ -16,7 +16,7 @@
 #    You should have received a copy of the GNU General Public License
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-VERSION="1.0.7"
+VERSION="1.0.8"
 
 import sys
 import glob
@@ -77,8 +77,9 @@ def checkDependencies():
 class BrowseControl(QHBoxLayout):
     """Control containing label, edit field and button
        Used to browse for files and directories"""
-    def __init__(self, label, browseTitle, toolTip, defaultPath, callback=None, extensions="", browseDirectory=False,
-                 setStatus=None, showHidden=False, parent=None):
+    def __init__(self, label, browseTitle, toolTip, defaultPath, callback=None,
+                 extensions="", browseDirectory=False, setStatus=None, showHidden=False,
+                 oneUp = False, parent=None):
         super(BrowseControl, self).__init__(parent)
 
         #control's label
@@ -89,12 +90,18 @@ class BrowseControl(QHBoxLayout):
         self.addWidget(self.edit,1)
         self.edit.setToolTip(toolTip)
         self.connect(self.edit, SIGNAL("textChanged(QString)"), self.edited)
-        #control's button
+        #control's up button
+        if oneUp:
+            self.uButton = QPushButton("Up")
+            self.addWidget(self.uButton)
+            self.uButton.setToolTip("Go one level up")
+            self.connect(self.uButton, SIGNAL("clicked()"), self.oneUp)
+        #control's browse button
         self.button = QPushButton("Browse")
         self.addWidget(self.button)
         self.button.setToolTip("Select new "+label)
         self.connect(self.button, SIGNAL("clicked()"), self.browse)
-        #control's default
+        #control's default button
         if defaultPath != "":
             self.dButton = QPushButton("Default")
             self.addWidget(self.dButton)
@@ -163,6 +170,9 @@ class BrowseControl(QHBoxLayout):
 
     def default(self):
         self.edit.setText(self.defaultPath)
+
+    def oneUp(self):
+        self.edit.setText(os.path.dirname(self.path))
 
 class EditControl(QHBoxLayout):
     """control containing label and edit control"""
@@ -242,7 +252,7 @@ class MainWindow(QMainWindow):
 
         self.application = BrowseControl("Toplevel app path", "Select toplevel application path", "Path to application's toplevel directory"+
             "\n(used to search for additional ico/png files and to guess application name)", "",
-            self.appCallback, browseDirectory=True, setStatus=self.setStatus)
+            self.appCallback, browseDirectory=True, setStatus=self.setStatus, oneUp = True)
         self.layout1.addLayout(self.application)
 
         self.name = EditControl("Name","Launcher's name")
@@ -259,7 +269,7 @@ class MainWindow(QMainWindow):
         self.iconWidget.setIconSize(QSize(256,256))
         
         self.prefix = BrowseControl("Wine prefix path", "Select Wine prefix path", 
-            "Path to directory containing Wine prefixes (bottles)", self.cfgDefaults['WinePrefix'],
+            "Path to directory containing Wine prefix (bottle)", self.cfgDefaults['WinePrefix'],
             browseDirectory=True, setStatus=self.setStatus, showHidden=True)
         self.layout1.addLayout(self.prefix)
 
@@ -286,6 +296,20 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.debug)
         self.debug.setToolTip("Show output of application running under Wine")
         self.connect(self.debug, SIGNAL("clicked()"), self.debugLauncher)
+
+        #fix layout
+        layout = QHBoxLayout()
+        self.layout1.addLayout(layout)
+
+        self.resolutionFix = QCheckBox("Try to fix wrong resolution after application exit")
+        layout.addWidget(self.resolutionFix)
+        self.resolutionFix.setToolTip("Add 'xrandr -s 0' at the end of command line\nto force native resolution after the application exits")
+        self.resolutionFix.setCheckState(Qt.Unchecked)
+
+        self.legacyFS = QCheckBox("Compiz Legacy Fullscreen Support")
+        layout.addWidget(self.legacyFS)
+        self.legacyFS.setToolTip("Turno on Compiz Legacy Fullscreen Support before starting the application\n(fix for Ubuntu 12.04 LTS)")
+        self.legacyFS.setCheckState(Qt.Unchecked)
 
         #always visible buttons
         layout = QHBoxLayout()
@@ -423,8 +447,11 @@ class MainWindow(QMainWindow):
 
     def debugLauncher(self):
         exeDirectory = os.path.dirname(self.executable.path)
-        command = "cd \"" + exeDirectory + "\"; env WINEPREFIX=\"" + self.prefix.path + \
-                  "\" " + self.wine.text + " \"" + self.executable.path + "\""
+        s1 = "  ; xrandr -s 0" if self.resolutionFix.isChecked() else ""
+        s2 = "gconftool -s /apps/compiz-1/plugins/workarounds/screen0/options/legacy_fullscreen -s false -t bool ; "  if self.legacyFS.isChecked() else ""
+        s3 = " ; gconftool -s /apps/compiz-1/plugins/workarounds/screen0/options/legacy_fullscreen -s false -t bool"  if self.legacyFS.isChecked() else ""
+        command = s2 + "cd \"" + exeDirectory + "\"; env WINEPREFIX=\"" + self.prefix.path + \
+                  "\" " + self.wine.text + " \"" + self.executable.path + "\"" + s1 + s3
         dialog = DebugDialog(self.name.text, command)
         dialog.setModal(True)
         dialog.debug()
@@ -508,8 +535,11 @@ class MainWindow(QMainWindow):
         launcherText += "\nVersion=1.0"
         launcherText += "\nType=Application"
         launcherText += "\nTerminal=false"
-        launcherText += "\nExec=env WINEPREFIX=\"" + self.prefix.path + "\" " + \
-                        self.wine.text + " \"" + self.executable.path + "\""
+        s1 = "  ; xrandr -s 0" if self.resolutionFix.isChecked() else ""
+        s2 = "gconftool -s /apps/compiz-1/plugins/workarounds/screen0/options/legacy_fullscreen -s false -t bool ; "  if self.legacyFS.isChecked() else ""
+        s3 = " ; gconftool -s /apps/compiz-1/plugins/workarounds/screen0/options/legacy_fullscreen -s false -t bool"  if self.legacyFS.isChecked() else ""
+        launcherText += "\nExec=sh -c \"" + s2 + "env WINEPREFIX=\'" + self.prefix.path + "\' " + \
+                        self.wine.text + " \'" + self.executable.path + "\'" + s1 + s3 + "\""
         launcherText += "\nPath=" + exeDirectory
         launcherText += "\nName=" + self.name.text
         launcherText += "\nIcon=" + iconDestination
@@ -647,6 +677,11 @@ if __name__ == '__main__':
 
 """
 History of changes
+
+Version 1.0.8
+    - Added option for xrandr -s 0 (wrong resolution after exit fix)
+    - Added option to enable legacy Fullscreen Support under Compiz (fix for Ubuntu 12.04 LTS)
+    - Added button to go one level up for top level directory
 
 Version 1.0.7
     - Fixed handling of spaces in exe file path
