@@ -16,7 +16,7 @@
 #    You should have received a copy of the GNU General Public License
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-VERSION="1.0.6"
+VERSION="1.0.7"
 
 import sys
 import glob
@@ -38,7 +38,7 @@ def check_output(*popenargs, **kwargs):
        See http://www.python.org/2.4/license for licensing details."""
     if 'stdout' in kwargs:
         raise ValueError('stdout argument not allowed, it will be overridden.')
-    process = subprocess.Popen(stdout=subprocess.PIPE, *popenargs, **kwargs)
+    process = subprocess.Popen(stdout=subprocess.PIPE, stderr=subprocess.STDOUT, *popenargs, **kwargs)
     output, unused_err = process.communicate()
     retcode = process.poll()
     if retcode:
@@ -77,7 +77,7 @@ def checkDependencies():
 class BrowseControl(QHBoxLayout):
     """Control containing label, edit field and button
        Used to browse for files and directories"""
-    def __init__(self, label, browseTitle, toolTip, callback=None, extensions="", browseDirectory=False,
+    def __init__(self, label, browseTitle, toolTip, defaultPath, callback=None, extensions="", browseDirectory=False,
                  setStatus=None, showHidden=False, parent=None):
         super(BrowseControl, self).__init__(parent)
 
@@ -92,7 +92,14 @@ class BrowseControl(QHBoxLayout):
         #control's button
         self.button = QPushButton("Browse")
         self.addWidget(self.button)
+        self.button.setToolTip("Select new "+label)
         self.connect(self.button, SIGNAL("clicked()"), self.browse)
+        #control's default
+        if defaultPath != "":
+            self.dButton = QPushButton("Default")
+            self.addWidget(self.dButton)
+            self.dButton.setToolTip("Reset "+label+" to '"+defaultPath+"'")
+            self.connect(self.dButton, SIGNAL("clicked()"), self.default)
 
         #function to call after successful change of path
         self.callback = callback
@@ -114,6 +121,8 @@ class BrowseControl(QHBoxLayout):
         self.noCallback = False
         #is path valid
         self.pathValid = True
+        #default path
+        self.defaultPath = defaultPath
 
     def browse(self):
         """callback for Browse button"""
@@ -152,6 +161,9 @@ class BrowseControl(QHBoxLayout):
         if self.noCallback: return
         elif self.callback != None: self.callback()
 
+    def default(self):
+        self.edit.setText(self.defaultPath)
+
 class EditControl(QHBoxLayout):
     """control containing label and edit control"""
     def __init__(self, label, toolTip, callback=None, parent=None): 
@@ -172,10 +184,38 @@ class EditControl(QHBoxLayout):
         self.text = unicode(self.edit.text())
         if self.callback != None: self.callback()
 
+class DebugDialog(QDialog):
+    def __init__(self, name, command, parent=None):
+        super(DebugDialog, self).__init__(parent)
+        self.setWindowTitle('Output when launching "'+name+'"')
+        self.resize(700,700)
+        self.layout = QVBoxLayout()
+        self.debugOutput = QTextEdit()
+        self.layout.addWidget(self.debugOutput)
+        self.setLayout(self.layout)
+        self.command = command
+
+    def debug(self):
+        process = subprocess.Popen(self.command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
+        output, unused_err = process.communicate()
+        retcode = process.poll()
+        self.debugOutput.setPlainText(output)
+
 class MainWindow(QMainWindow):
     """main application window"""
     def __init__(self, parent=None): 
         super(MainWindow, self).__init__(parent)
+
+        #user's desktop location
+        self.desktopPath = check_output(["xdg-user-dir", "DESKTOP"]).decode("utf-8")
+        while self.desktopPath[-1] == "\n": self.desktopPath = self.desktopPath[:-1]
+
+        #default config options
+        self.cfgDefaults = {'Launcher': self.desktopPath,
+                            'Icons': os.path.expanduser("~/.local/share/icons/wlcreator"),
+                            'Wine': "wine",
+                            'WinePrefix': os.path.expanduser("~/.wine"),
+                            'Bottles': os.path.expanduser("~/")}
 
         self.setWindowTitle("Wine Launcher Creator")
         self.setWindowIcon(QIcon.fromTheme('wine'))
@@ -196,12 +236,13 @@ class MainWindow(QMainWindow):
         self.widget1.setLayout(self.layout1)
         self.centralWidgetLayout.addWidget(self.widget1)
 
-        self.executable = BrowseControl("Exe path", "Select exe file", "Path to an Windows executable file",
+        self.executable = BrowseControl("Exe path", "Select exe file", "Path to an Windows executable file", "",
             self.exeCallback, "exe (*.exe *.EXE)", setStatus=self.setStatus)
         self.layout1.addLayout(self.executable)
 
         self.application = BrowseControl("Toplevel app path", "Select toplevel application path", "Path to application's toplevel directory"+
-            "\n(used to search for additional ico/png files and to guess application name)", self.appCallback, browseDirectory=True, setStatus=self.setStatus)
+            "\n(used to search for additional ico/png files and to guess application name)", "",
+            self.appCallback, browseDirectory=True, setStatus=self.setStatus)
         self.layout1.addLayout(self.application)
 
         self.name = EditControl("Name","Launcher's name")
@@ -216,22 +257,50 @@ class MainWindow(QMainWindow):
         self.iconWidget.setMovement(QListView.Static)
         self.iconWidget.setResizeMode(QListView.Adjust)
         self.iconWidget.setIconSize(QSize(256,256))
-
+        
         self.prefix = BrowseControl("Wine prefix path", "Select Wine prefix path", 
-            "Path to directory containing Wine bottle", browseDirectory=True, setStatus=self.setStatus, showHidden=True)
+            "Path to directory containing Wine prefixes (bottles)", self.cfgDefaults['WinePrefix'],
+            browseDirectory=True, setStatus=self.setStatus, showHidden=True)
         self.layout1.addLayout(self.prefix)
+
+        #bottle adminsitration
+        layout = QHBoxLayout()
+        self.layout1.addLayout(layout)
+
+        button = QPushButton("Create new/select existing Wine prefix")
+        layout.addWidget(button)
+        button.setToolTip("Create new Wine prefix (bottle) in default prefix directory,\nor use existing if prefix already exists")
+        self.connect(button, SIGNAL("clicked()"), self.newBottle)
+
+        button = QPushButton("Launch WineCfg")
+        layout.addWidget(button)
+        button.setToolTip("Launch WineCfg for selected Wine prefix")
+        self.connect(button, SIGNAL("clicked()"), self.winecfg)
+
+        button = QPushButton("Launch WineTricks")
+        layout.addWidget(button)
+        button.setToolTip("Launch WineTricks for selected Wine prefix")
+        self.connect(button, SIGNAL("clicked()"), self.winetricks)
+
+        self.debug = QPushButton("Debug launching")
+        layout.addWidget(self.debug)
+        self.debug.setToolTip("Show output of application running under Wine")
+        self.connect(self.debug, SIGNAL("clicked()"), self.debugLauncher)
 
         #always visible buttons
         layout = QHBoxLayout()
         self.centralWidgetLayout.addLayout(layout)
+
         button = QPushButton("Settings")
         self.settings = button
         button.setCheckable(True)
         layout.addWidget(button)
         self.connect(button, SIGNAL("clicked()"), self.settingsToggle)
+
         button = QPushButton("Create exe launcher")
         layout.addWidget(button,1)
         self.connect(button, SIGNAL("clicked()"), self.createLauncher)
+
         button = QPushButton("About")
         layout.addWidget(button)
         self.connect(button, SIGNAL("clicked()"), self.about)
@@ -245,12 +314,18 @@ class MainWindow(QMainWindow):
         self.widget2.hide()
 
         self.launcher = BrowseControl("Launcher path", "Select launcher path",
-            "Path to directory for launcher creation", browseDirectory=True, setStatus=self.setStatus)
+            "Path to directory for launcher creation", self.cfgDefaults['Launcher'],
+            browseDirectory=True, setStatus=self.setStatus)
         self.layout2.addLayout(self.launcher)
 
         self.icons = BrowseControl("Icons path", "Select icons path", "Path to directory for storing icons",
-            browseDirectory=True, setStatus=self.setStatus)
+            self.cfgDefaults['Icons'], browseDirectory=True, setStatus=self.setStatus)
         self.layout2.addLayout(self.icons)
+
+        self.bottles = BrowseControl("Default Wine prefixes (bottles) path", "Select default wine bottles path",
+            "Path to directory for wine prefixes (bottles) creation", self.cfgDefaults['Bottles'],
+            browseDirectory=True, setStatus=self.setStatus)
+        self.layout2.addLayout(self.bottles)
 
         self.wine = EditControl("Wine command", "Command used to run Windows applications")
         self.layout2.addLayout(self.wine)
@@ -280,7 +355,7 @@ class MainWindow(QMainWindow):
         self.layout2.addWidget(button)
         self.connect(button, SIGNAL("clicked()"), self.openNoInternet)
 
-        button = QPushButton("Revert settings to default values")
+        button = QPushButton("Revert all settings to default values")
         self.layout2.addWidget(button)
         self.connect(button, SIGNAL("clicked()"), self.defaultConfig)
 
@@ -295,22 +370,12 @@ class MainWindow(QMainWindow):
         path = urllib.unquote(path)
         self.application.edit.setText(path.decode("utf-8"))
 
-        #user's desktop location
-        self.desktopPath = check_output(["xdg-user-dir", "DESKTOP"]).decode("utf-8")
-        while self.desktopPath[-1] == "\n": self.desktopPath = self.desktopPath[:-1]
-
-        #default config options
-        self.cfgDefaults = {'Launcher': self.desktopPath,
-                            'Icons': os.path.expanduser("~/.local/share/icons/wlcreator"),
-                            'Wine': "wine",
-                            'WinePrefix': os.path.expanduser("~/.wine")}
-
         #directory for program's configuration file
         self.config = os.path.expanduser("~/.config/wlcreator")
         self.loadConfig()
 
         self.populateIconList()
-        self.resize(QSize(700,500))
+        self.resize(QSize(700,600))
         if self.executable.path == "": self.setStatus("Select an exe file.")
 
     def cleanup(self):
@@ -343,6 +408,27 @@ class MainWindow(QMainWindow):
         """callback for application path"""
         self.name.edit.setText(os.path.basename(self.application.path))
         self.populateIconList()
+
+    def newBottle(self):
+        path = os.path.join(self.bottles.path,self.name.text)
+        if not os.access(path, os.F_OK):
+            os.makedirs(path)
+        self.prefix.edit.setText(path)
+
+    def winecfg(self):
+        bash("env WINEPREFIX=\""+self.prefix.path+"\" winecfg")
+
+    def winetricks(self):
+        bash("env WINEPREFIX=\""+self.prefix.path+"\" winetricks")
+
+    def debugLauncher(self):
+        exeDirectory = os.path.dirname(self.executable.path)
+        command = "cd \"" + exeDirectory + "\"; env WINEPREFIX=\"" + self.prefix.path + \
+                  "\" " + self.wine.text + " \"" + self.executable.path + "\""
+        dialog = DebugDialog(self.name.text, command)
+        dialog.setModal(True)
+        dialog.debug()
+        dialog.exec_()
 
     def populateIconList(self):
         """extracts and finds all icons for specified exe and app"""
@@ -452,6 +538,7 @@ class MainWindow(QMainWindow):
         self.icons.edit.setText(self.cfgDefaults['Icons'])
         self.wine.edit.setText(self.cfgDefaults['Wine'])
         self.prefix.edit.setText(self.cfgDefaults['WinePrefix'])
+        self.bottles.edit.setText(self.cfgDefaults['Bottles'])
 
     def loadConfig(self):
         """load configuration options"""
@@ -466,6 +553,7 @@ class MainWindow(QMainWindow):
                 self.icons.edit.setText(cfg.get("WLCreator","Icons").decode("utf-8"))
                 self.wine.edit.setText(cfg.get("WLCreator","Wine").decode("utf-8"))
                 self.prefix.edit.setText(cfg.get("WLCreator","WinePrefix").decode("utf-8"))
+                self.bottles.edit.setText(cfg.get("WLCreator","Bottles").decode("utf-8"))
                 cfgRead = True
         if not cfgRead:
             self.defaultConfig()
@@ -483,6 +571,7 @@ class MainWindow(QMainWindow):
         cfg.set("WLCreator","Icons",self.icons.path.encode("utf-8"))
         cfg.set("WLCreator","Wine",self.wine.text.encode("utf-8"))
         cfg.set("WLCreator","WinePrefix",self.prefix.path.encode("utf-8"))
+        cfg.set("WLCreator","Bottles",self.bottles.path.encode("utf-8"))
         cfg.write(cfgfile)
 
     def settingsToggle(self):
@@ -558,6 +647,15 @@ if __name__ == '__main__':
 
 """
 History of changes
+
+Version 1.0.7
+    - Fixed handling of spaces in exe file path
+    - Added button to create new Wine bottle/prefix
+    - Added buttons to launch WineCfg and WineTricks
+    - Added setting for default wine bottle path
+    - Program now analyses all exe files in given exe file directory
+    - Help is shown for browse control buttons
+    - Added launching programs and watching output, for debugging
 
 Version 1.0.6
     - Fix for missing 'WLCreator' section in config file
