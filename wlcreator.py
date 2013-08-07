@@ -50,21 +50,30 @@ def check_output(*popenargs, **kwargs):
 
 def bash(command, workdir=None):
     """Helper function to execute bash commands"""
-    command = shlex.split(command.encode("utf-8"))
-    #print "COMMAND:",command
+    #command = shlex.split(command.encode("utf-8"))
+    print "COMMAND:",command
+#    try:
+#        code = subprocess.call(command, stderr=subprocess.STDOUT, stdout=subprocess.PIPE, cwd=workdir)
+#    except:
+#        code = 127
     try:
-        code = subprocess.call(command, stderr=subprocess.STDOUT, stdout=subprocess.PIPE, cwd=workdir)
+        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                   shell=True, cwd=workdir)
+        output, unused_err = process.communicate()
+        code = process.poll()
     except:
         code = 127
-    #print "CODE:",code
-    return code
+    if len(output) > 0: print "OUTPUT:\n",output
+    print "CODE:",code
+    return code,output
 
 def checkDependencies():
-    """Helper function to check for imagemagick/icoutils"""
+    """Helper function to check for icoutils"""
     missing = False
     missingText = ""
     #check icoutils
-    if bash("wrestool --version") > 0:
+    code,output = bash("wrestool --version")
+    if code > 0:
         if missingText != "":
             missingText += "\n"
         missingText += "Missing dependencie: icoutils"
@@ -163,7 +172,7 @@ class BrowseControl(QHBoxLayout):
         if self.pathValid:
             if self.setStatus != None: self.setStatus()
         else:
-            if self.setStatus != None: self.setStatus(self.setStatusNotValid)
+            if self.setStatus != None: self.setStatus(self.setStatusNotValid + "('"+self.path+"' doesn't exist)")
             return
         if self.noCallback: return
         elif self.callback != None: self.callback()
@@ -188,6 +197,7 @@ class EditControl(QHBoxLayout):
         self.callback = callback
         self.edit.setToolTip(toolTip)
         self.connect(self.edit, SIGNAL("textChanged(QString)"), self.edited)
+        self.text = ""
 
     def edited(self):
         """callback for edit control"""
@@ -206,10 +216,16 @@ class DebugDialog(QDialog):
         self.command = command
 
     def debug(self):
-        process = subprocess.Popen(self.command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
-        output, unused_err = process.communicate()
-        retcode = process.poll()
+#        process = subprocess.Popen(self.command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
+#        output, unused_err = process.communicate()
+#        retcode = process.poll()
+        code,output = bash(self.command)
         self.debugOutput.setPlainText(output)
+
+class WaitDialog(QDialog):
+    def __init__(self, parent=None):
+        super(WaitDialog, self).__init__(parent)
+        self.setWindowTitle('Please wait...')
 
 class MainWindow(QMainWindow):
     """main application window"""
@@ -250,6 +266,9 @@ class MainWindow(QMainWindow):
             self.exeCallback, "exe (*.exe *.EXE)", setStatus=self.setStatus)
         self.layout1.addLayout(self.executable)
 
+        self.appParams = EditControl("Application parameters","Additional parameters that need to be sent to application")
+        self.layout1.addLayout(self.appParams)
+
         self.application = BrowseControl("Toplevel app path", "Select toplevel application path", "Path to application's toplevel directory"+
             "\n(used to search for additional ico/png files and to guess application name)", "",
             self.appCallback, browseDirectory=True, setStatus=self.setStatus, oneUp = True)
@@ -277,14 +296,14 @@ class MainWindow(QMainWindow):
         layout = QHBoxLayout()
         self.layout1.addLayout(layout)
 
-        button = QPushButton("Create new/select existing Wine prefix")
+        button = QPushButton("Select launcher's name as prefix")
         layout.addWidget(button)
-        button.setToolTip("Create new Wine prefix (bottle) in default prefix directory,\nor use existing if prefix already exists")
-        self.connect(button, SIGNAL("clicked()"), self.newBottle)
+        button.setToolTip("Select new Wine prefix (bottle) in default prefix directory,\nor use existing if prefix already exists.\nUses same name as the launcher name.")
+        self.connect(button, SIGNAL("clicked()"), self.selectPrefix)
 
-        button = QPushButton("Launch WineCfg")
+        button = QPushButton("Launch WineCfg/Populate prefix files")
         layout.addWidget(button)
-        button.setToolTip("Launch WineCfg for selected Wine prefix")
+        button.setToolTip("Launch WineCfg for selected Wine prefix\nand populate with wine files if necessary")
         self.connect(button, SIGNAL("clicked()"), self.winecfg)
 
         button = QPushButton("Launch WineTricks")
@@ -292,16 +311,16 @@ class MainWindow(QMainWindow):
         button.setToolTip("Launch WineTricks for selected Wine prefix")
         self.connect(button, SIGNAL("clicked()"), self.winetricks)
 
-        self.debug = QPushButton("Debug launching")
-        layout.addWidget(self.debug)
-        self.debug.setToolTip("Show output of application running under Wine")
-        self.connect(self.debug, SIGNAL("clicked()"), self.debugLauncher)
-
         #fix layout
         layout = QHBoxLayout()
         self.layout1.addLayout(layout)
 
-        self.resolutionFix = QCheckBox("Try to fix wrong resolution after application exit")
+        self.win32Prefix = QCheckBox("Create WIN32 Prefix")
+        layout.addWidget(self.win32Prefix)
+        self.win32Prefix.setToolTip("Add WINEARCH=win32 when calling winecfg for new prefix")
+        self.win32Prefix.setCheckState(Qt.Unchecked)
+
+        self.resolutionFix = QCheckBox("Restore resolution")
         layout.addWidget(self.resolutionFix)
         self.resolutionFix.setToolTip("Add 'xrandr -s 0' at the end of command line\nto force native resolution after the application exits")
         self.resolutionFix.setCheckState(Qt.Unchecked)
@@ -310,6 +329,11 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.legacyFS)
         self.legacyFS.setToolTip("Turno on Compiz Legacy Fullscreen Support before starting the application\n(fix for Ubuntu 12.04 LTS)")
         self.legacyFS.setCheckState(Qt.Unchecked)
+
+        self.debug = QPushButton("Debug launching")
+        layout.addWidget(self.debug)
+        self.debug.setToolTip("Try to launch the application,\nand show command line output after it finishes")
+        self.connect(self.debug, SIGNAL("clicked()"), self.debugLauncher)
 
         #always visible buttons
         layout = QHBoxLayout()
@@ -433,25 +457,45 @@ class MainWindow(QMainWindow):
         self.name.edit.setText(os.path.basename(self.application.path))
         self.populateIconList()
 
-    def newBottle(self):
+    def selectPrefix(self):
         path = os.path.join(self.bottles.path,self.name.text)
-        if not os.access(path, os.F_OK):
-            os.makedirs(path)
         self.prefix.edit.setText(path)
 
+#    def createPrefix(self):
+#        self.setStatus("Creating new prefix...")
+#        if not os.access(self.prefix.path, os.F_OK):
+#            os.makedirs(self.prefix.path)
+#        if not os.access(os.path.join(self.prefix.path,"user.reg"), os.F_OK):
+#            s1 = " WINEARCH=win32" if self.win32Prefix.isChecked() else ""
+#            bash("env" + s1 + " WINEPREFIX=\""+self.prefix.path+"\" wineboot")
+#            self.setStatus("New prefix is created in \'"+self.prefix.path+"\'")
+#        else:
+#            self.setStatus("Prefix alredy populated in \'"+self.prefix.path+"\'")
+
     def winecfg(self):
-        bash("env WINEPREFIX=\""+self.prefix.path+"\" winecfg")
+        self.setStatus("Launching winecfg...")
+#        if not os.access(self.prefix.path, os.F_OK):
+#            os.makedirs(self.prefix.path)
+        s1 = " WINEARCH=win32" if self.win32Prefix.isChecked() else ""
+        bash("env" + s1 + " WINEPREFIX=\""+self.prefix.path+"\" winecfg")
+        self.setStatus("Winecfg has finished")
 
     def winetricks(self):
-        bash("env WINEPREFIX=\""+self.prefix.path+"\" winetricks")
+        self.setStatus("Launching winetricks...")
+        if os.access(os.path.join(self.prefix.path,"user.reg"), os.F_OK):
+            bash("env WINEPREFIX=\""+self.prefix.path+"\" winetricks")
+            self.setStatus("Winetricks has finished")
+        else:
+            self.setStatus("Prefix \'"+self.prefix.path+"\' not populated. Run WineCfg first.")
 
     def debugLauncher(self):
         exeDirectory = os.path.dirname(self.executable.path)
         s1 = "  ; xrandr -s 0" if self.resolutionFix.isChecked() else ""
         s2 = "gconftool -s /apps/compiz-1/plugins/workarounds/screen0/options/legacy_fullscreen -s false -t bool ; "  if self.legacyFS.isChecked() else ""
         s3 = " ; gconftool -s /apps/compiz-1/plugins/workarounds/screen0/options/legacy_fullscreen -s false -t bool"  if self.legacyFS.isChecked() else ""
+        s4 = " " + self.appParams.text if self.appParams.text != "" else ""
         command = s2 + "cd \"" + exeDirectory + "\"; env WINEPREFIX=\"" + self.prefix.path + \
-                  "\" " + self.wine.text + " \"" + self.executable.path + "\"" + s1 + s3
+                  "\" " + self.wine.text + " \"" + self.executable.path + "\"" + s4 + s1 + s3
         dialog = DebugDialog(self.name.text, command)
         dialog.setModal(True)
         dialog.debug()
@@ -538,8 +582,9 @@ class MainWindow(QMainWindow):
         s1 = "  ; xrandr -s 0" if self.resolutionFix.isChecked() else ""
         s2 = "gconftool -s /apps/compiz-1/plugins/workarounds/screen0/options/legacy_fullscreen -s false -t bool ; "  if self.legacyFS.isChecked() else ""
         s3 = " ; gconftool -s /apps/compiz-1/plugins/workarounds/screen0/options/legacy_fullscreen -s false -t bool"  if self.legacyFS.isChecked() else ""
+        s4 = " " + self.appParams.text if self.appParams.text != "" else ""
         launcherText += "\nExec=sh -c \"" + s2 + "env WINEPREFIX=\'" + self.prefix.path + "\' " + \
-                        self.wine.text + " \'" + self.executable.path + "\'" + s1 + s3 + "\""
+                        self.wine.text + " \'" + self.executable.path + "\'" + s4 + s1 + s3 + "\""
         launcherText += "\nPath=" + exeDirectory
         launcherText += "\nName=" + self.name.text
         launcherText += "\nIcon=" + iconDestination
@@ -682,6 +727,8 @@ Version 1.0.8
     - Added option for xrandr -s 0 (wrong resolution after exit fix)
     - Added option to enable legacy Fullscreen Support under Compiz (fix for Ubuntu 12.04 LTS)
     - Added button to go one level up for top level directory
+    - Added option to create WIN32 prefix when calling winecfg
+    - Added edit box to enter additional parameters when calling exe
 
 Version 1.0.7
     - Fixed handling of spaces in exe file path
